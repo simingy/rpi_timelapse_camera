@@ -20,7 +20,7 @@ def time_until(next_timeslot):
     delta = next_timeslot - datetime.datetime.now()
     return delta - datetime.timedelta(microseconds=delta.microseconds)
 
-def get_next_timeslot(minutes):
+def get_next_timeslot(minutes, include_wkends = False):
     now = datetime.datetime.now()
     
     start_today = now.replace(hour=START_WORK, 
@@ -31,15 +31,25 @@ def get_next_timeslot(minutes):
                             minute=0, 
                             second=0, 
                             microsecond=0)
+
     if not (start_today <= now < end_today):
-        # move to next day
+        # move to next day - no longer working
         next_target = now + datetime.timedelta(days=1)
         next_target = next_target.replace(hour=START_WORK, 
                                           minute=0, 
                                           second=0, 
                                           microsecond=0)
+
+        # weekday() returns 0-6 for mon-sun
+        if not include_wkends and next_target.weekday() >= 5:
+            # move to the next monday
+            delta = 7 - next_target.weekday()
+            next_target = next_target + datetime.timedelta(days=delta)
+
         return next_target
 
+    
+    # still working - find the next interval
     delta = datetime.timedelta(minutes=minutes)
     return now + (datetime.datetime.min - now) % delta
 
@@ -51,6 +61,8 @@ def main():
     parser.add_argument('--secret', type=str, default='client_secret.json')
     parser.add_argument('--album', type=str, default='', 
                         help='album to save to')
+    parser.add_argument('--weekends', action="store_true", default = False,
+                        help="flag to also capture on weekends, default False")
     parser.add_argument('-v', '--verbose',
                               dest='verbose',
                               action='count',
@@ -115,7 +127,7 @@ def main():
                 f.write(buffer.read())
 
         # set next target
-        next_timeslot = get_next_timeslot(args.elapse)
+        next_timeslot = get_next_timeslot(args.elapse, args.weekends)
         logger.info('Next capture: %s' % next_timeslot.strftime(TIME_FORMAT))
 
         while datetime.datetime.now() < next_timeslot:
